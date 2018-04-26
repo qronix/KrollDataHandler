@@ -57,12 +57,18 @@ function splitFile($fileLocation){
     outputString("Dataset closing tag set to: ".$dataSetEndTag."\n");
     //identify XML item entry tag -> store to variable
     outputString("Capturing object entry tag.....\n");
-    $dataEntryTag = grabDataEntryTag($fileLocation,$xmlHeader[sizeof($xmlHeader)-1]);
-    outputString("Captured object entry tag as: ".$dataEntryTag."\n");
-    $dataEntryEndTag = createClosingTag($dataEntryTag);
-    outputString("Object closing tag set to: ".$dataEntryEndTag."\n");
+    $objectStartTag = grabDataEntryTag($fileLocation,$xmlHeader[sizeof($xmlHeader)-1]);
+    outputString("Captured object start tag as: ".$objectStartTag."\n");
+    $objectEndTag = createClosingTag($objectStartTag);
+    outputString("Object closing tag set to: ".$objectEndTag."\n");
     //count number of items in catalog -> store to variable
+    outputString("Determining number of target objects.....\n");
+    $objectsCount = getTagCountInFile($fileLocation,$objectStartTag);
+    outputString("There are ".$objectsCount." objects in the target file\n");
     //split file in to X number of files
+    outputString("Starting file splitting operation.......\n");
+    buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
+        'objectsPerFile'=>500,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
@@ -71,9 +77,110 @@ function splitFile($fileLocation){
     //output error or done message
 }
 
-function getTagCountInFile($fileLocation,$targetTag){
-    
+/*
+ * Split params are options for splitting the target file in to subfiles
+ *
+ * objectStartTag    -> The opening tag which denotes a data object such as an item
+ *
+ * objectEndTag      -> The closing tag which denotes the end of a data object such as an item
+ *
+ * objectsPerFile    -> The total number of objects the sub file will contain
+ *
+ * DataSetClosingTag -> The closing tag for the XML data set
+ *
+ * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ * */
+
+function buildSubFiles($fileLocation, $splitParams){
+    $subfileObjects = array();
+    try{
+        outputString("Checking for data directory...\n");
+        if(checkDataDirExists()){
+            outputString("Data directory was found....\n");
+        }else{
+            outputString("Data directory was created......\n");
+        }
+        $dateStamp = createFileDateStamp();
+
+//        fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
+        $dataToWrite = readFileFromStartToObjectCount($fileLocation,$splitParams);
+//        $subFile = fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
+        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
+        outputString("Writing data to subfile......\n");
+        foreach ($dataToWrite as $value){
+            fwrite($subFile, $value);
+        }
+        fclose($subFile);
+    }catch (Exception $exc){
+        outputString("An error occurred: ".$exc." stopping!\n");
+        die($exc);
+    }
+
 }
+
+function checkDataDirExists():bool{
+    try{
+        if(file_exists("../KrollData/dataSets")){
+            return true;
+        }else{
+            mkdir("../KrollData/dataSets");
+            return false;
+        }
+    }catch (Exception $exc){
+        outputString("An error occurred ".$exc."\n");
+        die("Fatal error occurred, cannot continue");
+    }
+}
+
+function createFileDateStamp():string{
+    $today = getdate();
+    $month = $today['mon'];
+    $day   = $today['mday'];
+    $year  = $today['year'];
+
+    return $month."_".$day."_".$year;
+}
+
+/*
+ * Split params are options for splitting the target file in to subfiles
+ *
+ * objectStartTag    -> The opening tag which denotes a data object such as an item
+ *
+ * objectEndTag      -> The closing tag which denotes the end of a data object such as an item
+ *
+ * objectsPerFile    -> The total number of objects the sub file will contain
+ *
+ * DataSetClosingTag -> The closing tag for the XML data set
+ *
+ * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ * */
+
+
+function readFileFromStartToObjectCount($fileLocation, $splitParams){
+    $file = "../".$fileLocation;
+    $handle = fopen($file,'r');
+    $pastHeader = false;
+    $currentObjectCount = 0;
+
+    while(!feof($handle)){
+        if(trim(fgets($handle))===$splitParams['XMLHeader'][sizeof($splitParams['XMLHeader']-1)]){
+            $pastHeader = true;
+        }
+        if($pastHeader){
+            if(trim(fgets($handle))===$splitParams['objectStartTag']){
+                $currentObjectCount++;
+                while(!feof($handle)&&$currentObjectCount<$splitParams['objectsPerFile']){
+                    $value = trim(fgets($handle));
+                    yield 'value' => $value;
+                    if($value===$splitParams['objectStartTag']){
+                        $currentObjectCount++;
+                    }
+                }
+            }
+        }
+    }
+}
+
 
 function createClosingTag($openingTag):string{
     $closingTag = str_replace("<","</",$openingTag);
@@ -121,4 +228,16 @@ function readFileToTargetGenerator($fileLocation,$target,$offset){
             }
         }
     }
+}
+
+function getTagCountInFile($fileLocation,$targetTag):int {
+    $file = "../".$fileLocation;
+    $handle = fopen($file,'r');
+    $tagCount = 0;
+    while(!feof($handle)){
+        if(($currentLine = trim(fgets($handle)))===$targetTag){
+            $tagCount++;
+        }
+    }
+    return $tagCount;
 }
