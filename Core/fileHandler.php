@@ -105,12 +105,12 @@ function buildSubFiles($fileLocation, $splitParams){
 //        fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
         $dataToWrite = readFileFromStartToObjectCount($fileLocation,$splitParams);
 //        $subFile = fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
-        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
+//        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
         outputString("Writing data to subfile......\n");
         foreach ($dataToWrite as $value){
-            fwrite($subFile, $value);
+            $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value);
         }
-        fclose($subFile);
+//        fclose($subFile);
     }catch (Exception $exc){
         outputString("An error occurred: ".$exc." stopping!\n");
         die($exc);
@@ -161,20 +161,23 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams){
     $handle = fopen($file,'r');
     $pastHeader = false;
     $currentObjectCount = 0;
-
+    outputString("Starting split, objects per file is set to: ".$splitParams['objectsPerFile']."\n");
+//    $headerEndTag = $splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])]
     while(!feof($handle)){
-        if(trim(fgets($handle))===$splitParams['XMLHeader'][sizeof($splitParams['XMLHeader']-1)]){
+        if(trim(fgets($handle))===($splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])-1])){
             $pastHeader = true;
         }
         if($pastHeader){
             if(trim(fgets($handle))===$splitParams['objectStartTag']){
-                $currentObjectCount++;
-                while(!feof($handle)&&$currentObjectCount<$splitParams['objectsPerFile']){
+//                $currentObjectCount++;
+                while(!feof($handle)||($currentObjectCount>=$splitParams['objectsPerFile'])){
                     $value = trim(fgets($handle));
-                    yield 'value' => $value;
+//                    yield 'value' => $value;
+                    outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
                     }
+                    outputString("Current object count is: ".$currentObjectCount."\n");
                 }
             }
         }
