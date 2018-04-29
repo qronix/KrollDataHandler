@@ -4,7 +4,7 @@ if(!empty($_POST['action'])&&$_POST['action']==='start'){
     GLOBAL $fileName;
     GLOBAL $directoryName;
     $directoryName='KrollData';
-    $fileName = 'KrollDealerCatalogProductExport.xml';
+    $fileName = 'KrollDealerCatalogProductExport1.xml';
 
    outputString("Starting........".PHP_EOL);
    outputString("\nSearching for ".$directoryName." directory.....\n");
@@ -108,7 +108,8 @@ function buildSubFiles($fileLocation, $splitParams){
 //        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
         outputString("Writing data to subfile......\n");
         foreach ($dataToWrite as $value){
-            $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value);
+            outputString("Current yielded value is: ".$value."\n");
+            $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
         }
 //        fclose($subFile);
     }catch (Exception $exc){
@@ -168,11 +169,11 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams){
             $pastHeader = true;
         }
         if($pastHeader){
-            if(trim(fgets($handle))===$splitParams['objectStartTag']){
-//                $currentObjectCount++;
+            if(($value=trim(fgets($handle)))===$splitParams['objectStartTag']){
+                yield 'value' => $value;
                 while(!feof($handle)||($currentObjectCount>=$splitParams['objectsPerFile'])){
                     $value = trim(fgets($handle));
-//                    yield 'value' => $value;
+                    yield 'value' => $value;
                     outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
