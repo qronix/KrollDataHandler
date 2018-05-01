@@ -68,7 +68,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader]);
+        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
@@ -89,6 +89,8 @@ function splitFile($fileLocation){
  * DataSetClosingTag -> The closing tag for the XML data set
  *
  * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ *
+ * numTargetObjects  -> The number of target objects in the XML file
  * */
 
 function buildSubFiles($fileLocation, $splitParams){
@@ -100,29 +102,33 @@ function buildSubFiles($fileLocation, $splitParams){
         }else{
             outputString("Data directory was created......\n");
         }
-        $dateStamp = createFileDateStamp();
 
-//        fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
-        $dataToWrite = readFileFromStartToObjectCount($fileLocation,$splitParams);
-//        $subFile = fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
-//        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
-        outputString("Writing data to subfile......\n");
-        $objectCount = 0;
-        //begin XML dataset
-        writeXMLHeader($dateStamp,$splitParams);
-        foreach ($dataToWrite as $value){
-            outputString("Current yielded value is: ".$value."\n");
-            if($value===$splitParams['objectStartTag']){
-                $objectCount++;
+        $numberOfSubfiles = ($splitParams['numTargetObjects']/$splitParams['objectsPerFile']);
+        outputString("Number of subfiles is: {$numberOfSubfiles}\n");
+
+        for($i=0; $i<$numberOfSubfiles; $i++) {
+
+            $dateStamp = createFileDateStamp();
+
+
+            $dataToWrite = readFileFromStartToObjectCount($fileLocation, $splitParams);
+            outputString("Writing data to subfile......\n");
+            $objectCount = 0;
+            //begin XML dataset
+            writeXMLHeader($dateStamp, $splitParams,$i);
+            foreach ($dataToWrite as $value) {
+                outputString("Current yielded value is: " . $value . "\n");
+                if ($value === $splitParams['objectStartTag']) {
+                    $objectCount++;
+                }
+                //if object count reached, close the dataset
+                if ($objectCount > $splitParams['objectsPerFile']) {
+                    file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $splitParams['DataSetClosingTag'] . PHP_EOL, FILE_APPEND);
+                    break;
+                }
+                file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $value . PHP_EOL, FILE_APPEND);
             }
-            //if object count reached, close the dataset
-            if($objectCount>$splitParams['objectsPerFile']){
-                file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$splitParams['DataSetClosingTag'].PHP_EOL,FILE_APPEND);
-                break;
-            }
-            $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
         }
-//        fclose($subFile);
     }catch (Exception $exc){
         outputString("An error occurred: ".$exc." stopping!\n");
         die($exc);
@@ -130,9 +136,9 @@ function buildSubFiles($fileLocation, $splitParams){
 
 }
 
-function writeXMLHeader($dateStamp,$splitParams){
+function writeXMLHeader($dateStamp,$splitParams,$fileNumber){
     foreach ($splitParams['XMLHeader'] as $value){
-        file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
+        file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp."_{$fileNumber}.xml",$value.PHP_EOL,FILE_APPEND);
     }
 }
 
@@ -171,6 +177,8 @@ function createFileDateStamp():string{
  * DataSetClosingTag -> The closing tag for the XML data set
  *
  * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ *
+ * numTargetObjects  -> The number of target objects in the XML file
  * */
 
 
