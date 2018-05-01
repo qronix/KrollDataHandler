@@ -114,6 +114,7 @@ function buildSubFiles($fileLocation, $splitParams){
             $dataToWrite = readFileFromStartToObjectCount($fileLocation, $splitParams,$startAtObjectNumber);
             outputString("Writing data to subfile......\n");
             $objectCount = 0;
+            $closeTagCount = 0;
             //begin XML dataset
             writeXMLHeader($dateStamp, $splitParams,$i);
             foreach ($dataToWrite as $value) {
@@ -122,12 +123,20 @@ function buildSubFiles($fileLocation, $splitParams){
                     $objectCount++;
                     $startAtObjectNumber++;
                 }
+                if($value === $splitParams['objectEndTag']){
+                    $closeTagCount++;
+                }
+
                 //if object count reached, close the dataset
-                if ($objectCount > $splitParams['objectsPerFile']) {
+//                if ($objectCount > $splitParams['objectsPerFile']) {
+//                    file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $splitParams['DataSetClosingTag'] . PHP_EOL, FILE_APPEND);
+//                    break;
+//                }
+                file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $value . PHP_EOL, FILE_APPEND);
+                if($closeTagCount>=$splitParams['objectsPerFile']){
                     file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $splitParams['DataSetClosingTag'] . PHP_EOL, FILE_APPEND);
                     break;
                 }
-                file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $value . PHP_EOL, FILE_APPEND);
             }
         }
     }catch (Exception $exc){
@@ -207,16 +216,16 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObject
                     if($value===$splitParams['objectStartTag']){
                         $objectsSeen++;
                     }
-                }while($objectsSeen<$startObjectNumber);
+                }while($objectsSeen<=$startObjectNumber);
             }
             if($value===$splitParams['objectStartTag']){
-                yield 'value' => $value;
                 while(($currentObjectCount<$splitParams['objectsPerFile'])){
+                    yield 'value' => $value;
                     $value = trim(fgets($handle));
                     if($value==""){
                         break;
                     }
-                    yield 'value' => $value;
+//                    yield 'value' => $value;
 //                    outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
