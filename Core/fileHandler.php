@@ -68,7 +68,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>500,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader]);
+        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
@@ -107,8 +107,19 @@ function buildSubFiles($fileLocation, $splitParams){
 //        $subFile = fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
 //        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
         outputString("Writing data to subfile......\n");
+        $objectCount = 0;
+        //begin XML dataset
+        writeXMLHeader($dateStamp,$splitParams);
         foreach ($dataToWrite as $value){
             outputString("Current yielded value is: ".$value."\n");
+            if($value===$splitParams['objectStartTag']){
+                $objectCount++;
+            }
+            //if object count reached, close the dataset
+            if($objectCount>$splitParams['objectsPerFile']){
+                file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$splitParams['DataSetClosingTag'].PHP_EOL,FILE_APPEND);
+                break;
+            }
             $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
         }
 //        fclose($subFile);
@@ -117,6 +128,12 @@ function buildSubFiles($fileLocation, $splitParams){
         die($exc);
     }
 
+}
+
+function writeXMLHeader($dateStamp,$splitParams){
+    foreach ($splitParams['XMLHeader'] as $value){
+        file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
+    }
 }
 
 function checkDataDirExists():bool{
@@ -171,7 +188,7 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams){
         if($pastHeader){
             if(($value=trim(fgets($handle)))===$splitParams['objectStartTag']){
                 yield 'value' => $value;
-                while(!feof($handle)||($currentObjectCount>=$splitParams['objectsPerFile'])){
+                while(($currentObjectCount<$splitParams['objectsPerFile'])){
                     $value = trim(fgets($handle));
                     yield 'value' => $value;
                     outputString("Output value is: " .$value."\n");
