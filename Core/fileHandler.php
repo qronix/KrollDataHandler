@@ -68,7 +68,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader]);
+        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
@@ -89,6 +89,8 @@ function splitFile($fileLocation){
  * DataSetClosingTag -> The closing tag for the XML data set
  *
  * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ *
+ * numTargetObjects  -> Number of target objects found in the XML file
  * */
 
 function buildSubFiles($fileLocation, $splitParams){
@@ -100,29 +102,35 @@ function buildSubFiles($fileLocation, $splitParams){
         }else{
             outputString("Data directory was created......\n");
         }
-        $dateStamp = createFileDateStamp();
 
-//        fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
-        $dataToWrite = readFileFromStartToObjectCount($fileLocation,$splitParams);
-//        $subFile = fopen($fileLocation."/dataSets/dataSet_".$dateStamp."xml","w");
-//        $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml","w");
-        outputString("Writing data to subfile......\n");
-        $objectCount = 0;
-        //begin XML dataset
-        writeXMLHeader($dateStamp,$splitParams);
-        foreach ($dataToWrite as $value){
-            outputString("Current yielded value is: ".$value."\n");
-            if($value===$splitParams['objectStartTag']){
-                $objectCount++;
+        $splitFileCount = ($splitParams['numTargetObjects']/$splitParams['objectsPerFile']);
+        $fileObjectCount = 0;
+        $currentObjectNumber = 0;
+        outputString("Number of files to split in to: ".$splitFileCount."\n");
+        for($i=0;$i<$splitFileCount;$i++){
+            $dateStamp = createFileDateStamp();
+
+            $dataToWrite = readFileFromStartToObjectCount($fileLocation,$splitParams,$currentObjectNumber);
+            outputString("Writing data to subfile......\n");
+
+            //begin XML dataset
+            writeXMLHeader($dateStamp,$splitParams,$i);
+            foreach ($dataToWrite as $value){
+//                outputString("Current yielded value is: ".$value."\n");
+                if($value===$splitParams['objectStartTag']){
+                    $fileObjectCount++;
+                    $currentObjectNumber++;
+                    outputString("Current object number is : ".$currentObjectNumber."\n");
+                }
+                //if object count reached, close the dataset
+                if(($fileObjectCount)>$splitParams['objectsPerFile']){
+                    file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp."_".$i.".xml",$splitParams['DataSetClosingTag'].PHP_EOL,FILE_APPEND);
+                    break;
+                }
+                $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp."_".$i.".xml",$value.PHP_EOL,FILE_APPEND);
             }
-            //if object count reached, close the dataset
-            if($objectCount>$splitParams['objectsPerFile']){
-                file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$splitParams['DataSetClosingTag'].PHP_EOL,FILE_APPEND);
-                break;
-            }
-            $subFile = file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
-        }
 //        fclose($subFile);
+        }
     }catch (Exception $exc){
         outputString("An error occurred: ".$exc." stopping!\n");
         die($exc);
@@ -130,9 +138,9 @@ function buildSubFiles($fileLocation, $splitParams){
 
 }
 
-function writeXMLHeader($dateStamp,$splitParams){
+function writeXMLHeader($dateStamp,$splitParams,$fileNumber){
     foreach ($splitParams['XMLHeader'] as $value){
-        file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp.".xml",$value.PHP_EOL,FILE_APPEND);
+        file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp."_".$fileNumber.".xml",$value.PHP_EOL,FILE_APPEND);
     }
 }
 
@@ -171,32 +179,46 @@ function createFileDateStamp():string{
  * DataSetClosingTag -> The closing tag for the XML data set
  *
  * XMLHeader         -> The XML file header which will be contained at the top of each sub file
+ *
+ * numTargetObjects  -> Number of target objects found in the XML file
  * */
 
 
-function readFileFromStartToObjectCount($fileLocation, $splitParams){
+function readFileFromStartToObjectCount($fileLocation, $splitParams,$startAtObjectNumber){
     $file = "../".$fileLocation;
     $handle = fopen($file,'r');
     $pastHeader = false;
     $currentObjectCount = 0;
+    $currentObjectPosition = 0;
     outputString("Starting split, objects per file is set to: ".$splitParams['objectsPerFile']."\n");
+    outputString("Starting at object number: ".$startAtObjectNumber."\n");
 //    $headerEndTag = $splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])]
     while(!feof($handle)){
         if(trim(fgets($handle))===($splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])-1])){
             $pastHeader = true;
         }
         if($pastHeader){
-            if(($value=trim(fgets($handle)))===$splitParams['objectStartTag']){
+            outputString("Current object position is: ".$currentObjectPosition."\n");
+            outputString("Starting at object ".$startAtObjectNumber."\n");
+            $value=trim(fgets($handle));
+            outputString("Value is {$value}.\n");
+            if(($value=trim(fgets($handle)))===$splitParams['objectStartTag']&&($currentObjectPosition===$startAtObjectNumber)){
                 yield 'value' => $value;
                 while(($currentObjectCount<$splitParams['objectsPerFile'])){
                     $value = trim(fgets($handle));
                     yield 'value' => $value;
-                    outputString("Output value is: " .$value."\n");
+//                    outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
+                        $currentObjectPosition++;
                     }
                     outputString("Current object count is: ".$currentObjectCount."\n");
                 }
+            }
+            if($value=trim(fgets($handle))===$splitParams['objectStartTag']&&($currentObjectPosition!==$startAtObjectNumber)){
+                $currentObjectPosition++;
+                outputString("Current object position is: ".$currentObjectPosition."\n");
+                outputString("Continuing to target object.....\n");
             }
         }
     }
