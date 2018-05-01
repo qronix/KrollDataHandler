@@ -94,7 +94,6 @@ function splitFile($fileLocation){
  * */
 
 function buildSubFiles($fileLocation, $splitParams){
-    $subfileObjects = array();
     try{
         outputString("Checking for data directory...\n");
         if(checkDataDirExists()){
@@ -103,6 +102,7 @@ function buildSubFiles($fileLocation, $splitParams){
             outputString("Data directory was created......\n");
         }
 
+        $startAtObjectNumber = 0;
         $numberOfSubfiles = ($splitParams['numTargetObjects']/$splitParams['objectsPerFile']);
         outputString("Number of subfiles is: {$numberOfSubfiles}\n");
 
@@ -111,15 +111,16 @@ function buildSubFiles($fileLocation, $splitParams){
             $dateStamp = createFileDateStamp();
 
 
-            $dataToWrite = readFileFromStartToObjectCount($fileLocation, $splitParams);
+            $dataToWrite = readFileFromStartToObjectCount($fileLocation, $splitParams,$startAtObjectNumber);
             outputString("Writing data to subfile......\n");
             $objectCount = 0;
             //begin XML dataset
             writeXMLHeader($dateStamp, $splitParams,$i);
             foreach ($dataToWrite as $value) {
-                outputString("Current yielded value is: " . $value . "\n");
+//                outputString("Current yielded value is: " . $value . "\n");
                 if ($value === $splitParams['objectStartTag']) {
                     $objectCount++;
+                    $startAtObjectNumber++;
                 }
                 //if object count reached, close the dataset
                 if ($objectCount > $splitParams['objectsPerFile']) {
@@ -182,11 +183,12 @@ function createFileDateStamp():string{
  * */
 
 
-function readFileFromStartToObjectCount($fileLocation, $splitParams){
+function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObjectNumber){
     $file = "../".$fileLocation;
     $handle = fopen($file,'r');
     $pastHeader = false;
     $currentObjectCount = 0;
+    $objectsSeen = 0;
     outputString("Starting split, objects per file is set to: ".$splitParams['objectsPerFile']."\n");
 //    $headerEndTag = $splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])]
     while(!feof($handle)){
@@ -194,12 +196,28 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams){
             $pastHeader = true;
         }
         if($pastHeader){
-            if(($value=trim(fgets($handle)))===$splitParams['objectStartTag']){
+            $value=trim(fgets($handle));
+            if($value===$splitParams['objectStartTag']){
+                $objectsSeen++;
+            }
+            //are we at the target object?
+            if($startObjectNumber!==0){
+                do{
+                    $value=trim(fgets($handle));
+                    if($value===$splitParams['objectStartTag']){
+                        $objectsSeen++;
+                    }
+                }while($objectsSeen<$startObjectNumber);
+            }
+            if($value===$splitParams['objectStartTag']){
                 yield 'value' => $value;
                 while(($currentObjectCount<$splitParams['objectsPerFile'])){
                     $value = trim(fgets($handle));
+                    if($value==""){
+                        break;
+                    }
                     yield 'value' => $value;
-                    outputString("Output value is: " .$value."\n");
+//                    outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
                     }
