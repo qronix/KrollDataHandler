@@ -68,7 +68,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>2,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
+        'objectsPerFile'=>3,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
@@ -103,7 +103,7 @@ function buildSubFiles($fileLocation, $splitParams){
         }
 
         $startAtObjectNumber = 0;
-        $numberOfSubfiles = ($splitParams['numTargetObjects']/$splitParams['objectsPerFile']);
+        $numberOfSubfiles = $splitParams['numTargetObjects']/$splitParams['objectsPerFile'];
         outputString("Number of subfiles is: {$numberOfSubfiles}\n");
 
         for($i=0; $i<$numberOfSubfiles; $i++) {
@@ -213,6 +213,9 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObject
             if($startObjectNumber!==0){
                 do{
                     $value=trim(fgets($handle));
+                    if($value==""){
+                        break;
+                    }
                     if($value===$splitParams['objectStartTag']){
                         $objectsSeen++;
                     }
@@ -230,8 +233,11 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObject
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
                     }
-                    outputString("Current object count is: ".$currentObjectCount."\n");
+//                    outputString("Current object count is: ".$currentObjectCount."\n");
                 }
+            }
+            if($value==""){
+                break;
             }
         }
     }
