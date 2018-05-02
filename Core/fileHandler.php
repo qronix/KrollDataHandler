@@ -12,6 +12,7 @@ if(!empty($_POST['action'])&&$_POST['action']==='start'){
        outputString($directoryName. " directory found.....\n");
        if(validateFile($directoryName,$fileName)){
            outputString($fileName." file was found.....\n");
+           sanitizeFile($directoryName."/".$fileName);
            splitFile($directoryName."/".$fileName);
        }else{
            outputString($fileName. " not found, halting execution.\n");
@@ -56,14 +57,44 @@ function outputString($stringOut){
  *
  * */
 
+function sanitizeFile($fileLocation){
+    outputString("Sanitizing file contents.......\n");
+    $readingFile = fopen("../".$fileLocation,'r');
+    $writingFile = fopen("../".$fileLocation.'.tmp','w');
+    $replacedLine = false;
+    $linesReplaced = 0;
+
+    while(!feof($readingFile)){
+        $line = trim(fgets($readingFile));
+        if(preg_match('/^\n/',$line,$matches)){
+            $replacedLine = true;
+            $linesReplaced++;
+            continue;
+        }elseif (preg_match('/^(\s)*\n/',$line,$matches)){
+            $replacedLine = true;
+            $linesReplaced++;
+            continue;
+        }else{
+            file_put_contents("../".$fileLocation.'.tmp',$line.PHP_EOL,FILE_APPEND);
+        }
+    }
+
+    fclose($readingFile);
+    fclose($writingFile);
+
+    if($replacedLine){
+        unlink($fileLocation);
+        rename($fileLocation.'.tmp','KrollDealerCatalogProductExport1.xml');
+    }
+
+    outputString("{$fileLocation} has been sanitized, {$linesReplaced} lines removed....\n");
+}
 
 
-/*Locate kroll data file and split in to more manageable files*/
+
+/*Locate Kroll data file and split in to more manageable files*/
 
 function splitFile($fileLocation){
-//    $xmlHeader = array();
-//    $dataSetEndTag = "";
-    //find XML header -> store to header variable
     outputString("Grabbing XML schema data.....\n");
     if(!empty($xmlHeader=grabXMLHeader($fileLocation))){
         outputString("XML schema header found.\n");
