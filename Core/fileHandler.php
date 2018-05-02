@@ -1,8 +1,6 @@
 <?php
 
 if(!empty($_POST['action'])&&$_POST['action']==='start'){
-    GLOBAL $fileName;
-    GLOBAL $directoryName;
     $directoryName='KrollData';
     $fileName = 'KrollDealerCatalogProductExport1.xml';
 
@@ -13,7 +11,6 @@ if(!empty($_POST['action'])&&$_POST['action']==='start'){
        if(validateFile($directoryName,$fileName)){
            outputString($fileName." file was found.....\n");
            sanitizeFile($directoryName."/".$fileName);
-           splitFile($directoryName."/".$fileName);
        }else{
            outputString($fileName. " not found, halting execution.\n");
            die($fileName." Not Found");
@@ -26,22 +23,17 @@ if(!empty($_POST['action'])&&$_POST['action']==='start'){
     outputString("An invalid value was passed to the file handler, halting execution!\n");
     die("\nINVALID POST DATA");
 }
-
 function validateDirectory($dirName):bool {
     return file_exists('../'.$dirName);
 }
-
 function validateFile($directory,$filename){
     return file_exists('../'.$directory.'/'.$filename);
 }
-
+/*Outputs html safe text with newlines changed to <br> tags*/
 function outputString($stringOut){
     echo nl2br(htmlentities($stringOut,ENT_QUOTES)."\n");
 }
-
-/*
- *
- * Kroll data catalog is very dirty data
+/* Kroll data catalog is very dirty data
  * The file contains two problems which interfere with splitting:
  *
  * Some lines are completely blank
@@ -54,46 +46,48 @@ function outputString($stringOut){
  *
  * new lines : ^\n    (Blank lines)
  * new lines with spaces : ^(\s)*\n (Tab indented lines with spaces)
- *
- * */
-
+ */
 function sanitizeFile($fileLocation){
-    outputString("Sanitizing file contents.......\n");
-    $readingFile = fopen("../".$fileLocation,'r');
-    $writingFile = fopen("../".$fileLocation.'.tmp','w');
-    $replacedLine = false;
-    $linesReplaced = 0;
+    try{
+        outputString("Sanitizing file contents.......\n");
+        $readingFile = fopen("../".$fileLocation,'r');
+        $writingFile = fopen("../".$fileLocation.'.clean','w');
+        $replacedLine = false;
+        $linesReplaced = 0;
 
-    while(!feof($readingFile)){
-        $line = trim(fgets($readingFile));
-        if(preg_match('/^\n/',$line,$matches)){
-            $replacedLine = true;
-            $linesReplaced++;
-            continue;
-        }elseif (preg_match('/^(\s)*\n/',$line,$matches)){
-            $replacedLine = true;
-            $linesReplaced++;
-            continue;
-        }else{
-            file_put_contents("../".$fileLocation.'.tmp',$line.PHP_EOL,FILE_APPEND);
+        while(!feof($readingFile)){
+            $line = trim(fgets($readingFile));
+            if(preg_match('/^\n/',$line,$matches)){
+                $replacedLine = true;
+                $linesReplaced++;
+                continue;
+            }elseif (preg_match('/^(\s)*\n/',$line,$matches)){
+                $replacedLine = true;
+                $linesReplaced++;
+                continue;
+            }elseif($line==""||is_null($line)){
+                $replacedLine = true;
+                $linesReplaced++;
+                continue;
+            }
+            else{
+                file_put_contents("../".$fileLocation.'.clean',$line.PHP_EOL,FILE_APPEND);
+            }
         }
+        fclose($readingFile);
+        fclose($writingFile);
+        outputString("{$fileLocation} has been sanitized, {$linesReplaced} lines removed....\n");
+        if($replacedLine){
+            unlink("../".$fileLocation);
+            splitFile($fileLocation.".clean");
+        }else{
+            splitFile($fileLocation);
+        }
+    }catch(Exception $exc){
+        outputString("An error occurred: {$exc}\n");
     }
-
-    fclose($readingFile);
-    fclose($writingFile);
-
-    if($replacedLine){
-        unlink($fileLocation);
-        rename($fileLocation.'.tmp','KrollDealerCatalogProductExport1.xml');
-    }
-
-    outputString("{$fileLocation} has been sanitized, {$linesReplaced} lines removed....\n");
 }
-
-
-
 /*Locate Kroll data file and split in to more manageable files*/
-
 function splitFile($fileLocation){
     outputString("Grabbing XML schema data.....\n");
     if(!empty($xmlHeader=grabXMLHeader($fileLocation))){
@@ -119,17 +113,9 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>1000,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
-    //copy XML header information to beginning of each file
-    //build data set from original (large) file -> place in new file
-    //close new file with XML data set closing tag at bottom of file
-    //repeat operations until large file is split
-    //close original file
-    //output error or done message
+        'objectsPerFile'=>1,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
 }
-
-/*
- * Split params are options for splitting the target file in to subfiles
+/*Split params are options for splitting the target file in to subfiles
  *
  * objectStartTag    -> The opening tag which denotes a data object such as an item
  *
@@ -142,8 +128,7 @@ function splitFile($fileLocation){
  * XMLHeader         -> The XML file header which will be contained at the top of each sub file
  *
  * numTargetObjects  -> The number of target objects in the XML file
- * */
-
+ */
 function buildSubFiles($fileLocation, $splitParams){
     try{
         outputString("Checking for data directory...\n");
@@ -158,10 +143,7 @@ function buildSubFiles($fileLocation, $splitParams){
         outputString("Number of subfiles is: {$numberOfSubfiles}\n");
 
         for($i=0; $i<$numberOfSubfiles; $i++) {
-
             $dateStamp = createFileDateStamp();
-
-
             $dataToWrite = readFileFromStartToObjectCount($fileLocation, $splitParams,$startAtObjectNumber);
             outputString("Writing data to subfile......\n");
             $objectCount = 0;
@@ -169,7 +151,6 @@ function buildSubFiles($fileLocation, $splitParams){
             //begin XML dataset
             writeXMLHeader($dateStamp, $splitParams,$i);
             foreach ($dataToWrite as $value) {
-//                outputString("Current yielded value is: " . $value . "\n");
                 if ($value === $splitParams['objectStartTag']) {
                     $objectCount++;
                     $startAtObjectNumber++;
@@ -177,12 +158,6 @@ function buildSubFiles($fileLocation, $splitParams){
                 if($value === $splitParams['objectEndTag']){
                     $closeTagCount++;
                 }
-
-                //if object count reached, close the dataset
-//                if ($objectCount > $splitParams['objectsPerFile']) {
-//                    file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $splitParams['DataSetClosingTag'] . PHP_EOL, FILE_APPEND);
-//                    break;
-//                }
                 file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $value . PHP_EOL, FILE_APPEND);
                 if($closeTagCount>=$splitParams['objectsPerFile']){
                     file_put_contents("../KrollData/dataSets/dataSet_" . $dateStamp."_{$i}.xml", $splitParams['DataSetClosingTag'] . PHP_EOL, FILE_APPEND);
@@ -194,15 +169,12 @@ function buildSubFiles($fileLocation, $splitParams){
         outputString("An error occurred: ".$exc." stopping!\n");
         die($exc);
     }
-
 }
-
 function writeXMLHeader($dateStamp,$splitParams,$fileNumber){
     foreach ($splitParams['XMLHeader'] as $value){
         file_put_contents("../KrollData/dataSets/dataSet_".$dateStamp."_{$fileNumber}.xml",$value.PHP_EOL,FILE_APPEND);
     }
 }
-
 function checkDataDirExists():bool{
     try{
         if(file_exists("../KrollData/dataSets")){
@@ -216,7 +188,6 @@ function checkDataDirExists():bool{
         die("Fatal error occurred, cannot continue");
     }
 }
-
 function createFileDateStamp():string{
     $today = getdate();
     $month = $today['mon'];
@@ -225,7 +196,6 @@ function createFileDateStamp():string{
 
     return $month."_".$day."_".$year;
 }
-
 /*
  * Split params are options for splitting the target file in to subfiles
  *
@@ -241,16 +211,14 @@ function createFileDateStamp():string{
  *
  * numTargetObjects  -> The number of target objects in the XML file
  * */
-
-
 function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObjectNumber){
     $file = "../".$fileLocation;
     $handle = fopen($file,'r');
     $pastHeader = false;
     $currentObjectCount = 0;
     $objectsSeen = 0;
+
     outputString("Starting split, objects per file is set to: ".$splitParams['objectsPerFile']."\n");
-//    $headerEndTag = $splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])]
     while(!feof($handle)){
         if(trim(fgets($handle))===($splitParams['XMLHeader'][sizeof($splitParams['XMLHeader'])-1])){
             $pastHeader = true;
@@ -279,12 +247,9 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObject
                     if($value==""){
                         break;
                     }
-//                    yield 'value' => $value;
-//                    outputString("Output value is: " .$value."\n");
                     if($value===$splitParams['objectStartTag']){
                         $currentObjectCount++;
                     }
-//                    outputString("Current object count is: ".$currentObjectCount."\n");
                 }
             }
             if($value==""){
@@ -293,8 +258,6 @@ function readFileFromStartToObjectCount($fileLocation, $splitParams,$startObject
         }
     }
 }
-
-
 function createClosingTag($openingTag):string{
     $closingTag = str_replace("<","</",$openingTag);
     return $closingTag;
@@ -303,16 +266,13 @@ function grabXMLHeader($fileLocation):array {
     $responseData = readFileToTarget($fileLocation,"</xs:schema>",null);
     return $responseData;
 }
-
 function grabDataEntryTag($fileLocation,$endOfHeaderTarget):string{
     $responseData = readFileToTarget($fileLocation,$endOfHeaderTarget,1);
     return $responseData[sizeof($responseData)-1];
 }
-
 function readFileToTarget($fileLocation, $target,$offset):array {
     outputString("Line target is: ".$target."\n");
     $fileArray = array();
-
     $fileGen = readFileToTargetGenerator($fileLocation,$target,$offset);
 
     foreach ($fileGen as $value){
@@ -320,7 +280,6 @@ function readFileToTarget($fileLocation, $target,$offset):array {
     }
     return $fileArray;
 }
-
 function readFileToTargetGenerator($fileLocation,$target,$offset){
     $file = "../".$fileLocation;
     $handle = fopen($file,'r');
@@ -342,7 +301,6 @@ function readFileToTargetGenerator($fileLocation,$target,$offset){
         }
     }
 }
-
 function getTagCountInFile($fileLocation,$targetTag):int {
     $file = "../".$fileLocation;
     $handle = fopen($file,'r');
