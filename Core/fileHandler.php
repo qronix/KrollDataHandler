@@ -38,6 +38,26 @@ function outputString($stringOut){
     echo nl2br(htmlentities($stringOut,ENT_QUOTES)."\n");
 }
 
+/*
+ *
+ * Kroll data catalog is very dirty data
+ * The file contains two problems which interfere with splitting:
+ *
+ * Some lines are completely blank
+ * Some lines are tab indented AND completely blank
+ *
+ * This causes problems for our splitter and results in inconsistent file structures
+ *
+ * This function reads through the Kroll catalog and searches for both
+ * types of problems via the following regular expressions:
+ *
+ * new lines : ^\n    (Blank lines)
+ * new lines with spaces : ^(\s)*\n (Tab indented lines with spaces)
+ *
+ * */
+
+
+
 /*Locate kroll data file and split in to more manageable files*/
 
 function splitFile($fileLocation){
@@ -68,7 +88,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>3,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
+        'objectsPerFile'=>1000,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
     //copy XML header information to beginning of each file
     //build data set from original (large) file -> place in new file
     //close new file with XML data set closing tag at bottom of file
