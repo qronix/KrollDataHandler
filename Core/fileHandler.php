@@ -2,7 +2,7 @@
 
 if(!empty($_POST['action'])&&$_POST['action']==='start'){
     $directoryName='KrollData';
-    $fileName = 'KrollDealerCatalogProductExport1.xml';
+    $fileName = 'KrollDealerCatalogProductExport.xml';
 
    outputString("Starting........".PHP_EOL);
    outputString("\nSearching for ".$directoryName." directory.....\n");
@@ -113,7 +113,7 @@ function splitFile($fileLocation){
     //split file in to X number of files
     outputString("Starting file splitting operation.......\n");
     buildSubFiles($fileLocation,['objectStartTag'=>$objectStartTag,'objectEndTag'=>$objectEndTag,
-        'objectsPerFile'=>1,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
+        'objectsPerFile'=>1000,'DataSetClosingTag'=>$dataSetEndTag,'XMLHeader'=>$xmlHeader,'numTargetObjects'=>$objectsCount]);
 }
 /*Split params are options for splitting the target file in to subfiles
  *
